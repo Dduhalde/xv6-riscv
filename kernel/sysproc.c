@@ -5,6 +5,7 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "proc.h"
+#include <stddef.h>
 
 uint64
 sys_exit(void)
@@ -90,4 +91,32 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+uint64
+sys_getppid(void)
+{
+  return myproc()->parent->pid;
+}
+
+uint64
+sys_getancestor(int n)
+{
+  argint(0, &n);
+  
+  if (n == 0) {
+    return myproc()->pid;
+  } else if (n == 1) {
+    if (myproc()->parent == NULL) {
+      return -1;
+    }
+    return myproc()->parent->pid;
+  } else if (n == 2) {
+    if (myproc()->parent == NULL || myproc()->parent->parent == NULL) {
+      return -1;
+    }
+    return myproc()->parent->parent->pid;
+  } else {
+    return -1;
+  }
 }
