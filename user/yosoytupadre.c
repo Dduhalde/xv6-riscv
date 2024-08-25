@@ -2,7 +2,7 @@
 #include "kernel/stat.h"
 #include "user/user.h"
 
-int main(int argc, char *argv[]) {
-    printf("Yo soy tu padre - dijo el proceso %d\n", getancestor(argc));
+int main() {
+    printf("Yo soy tu padre - dijo el proceso %d\n", getppid());
     exit(0);
 }
