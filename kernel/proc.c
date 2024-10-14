@@ -146,6 +146,10 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
+  // Set the priority and boost of the process
+  p->priority = 0; // default priority
+  p->boost = 1; // default boost
+
   return p;
 }
 
@@ -458,6 +462,20 @@ scheduler(void)
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if(p->state == RUNNABLE) {
+
+        // Regla 1
+        p->priority += p->boost; // increase the priority of the process
+
+        // Regla 2
+        if (p->priority >= 9) { // if the priority is greater than or equal to 9
+          p->boost = -1; // set the boost to -1
+        }
+        
+        // Regla 3
+        if (p->priority <= 0) { // if the priority is less than or equal to 0
+          p->boost = 1; // set the boost to 1
+        }
+
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
