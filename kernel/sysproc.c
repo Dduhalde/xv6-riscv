@@ -5,6 +5,7 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "proc.h"
+#include <stdint.h>
 
 uint64
 sys_exit(void)
@@ -90,4 +91,32 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+// tarea 3
+
+uint64
+sys_mprotect(void)
+{
+  int d;
+  int n;
+  argint(0, &d);
+  argint(1, &n);
+  if (d == 0 || n == 0)
+    return -1;
+
+  return mprotect((void *)(uintptr_t)d, n);
+}
+
+uint64
+sys_munprotect(void)
+{
+  int d;
+  int n;
+  argint(0, &d);
+  argint(1, &n);
+  if (d == 0 || n == 0)
+    return -1;
+
+  return munprotect((void *)(uintptr_t)d, n);
 }

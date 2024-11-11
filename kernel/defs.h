@@ -141,6 +141,10 @@ int             fetchstr(uint64, char*, int);
 int             fetchaddr(uint64, uint64*);
 void            syscall();
 
+// tarea 3
+int             mprotect(void *addr, int len);
+int             munprotect(void *addr, int len);
+
 // trap.c
 extern uint     ticks;
 void            trapinit(void);

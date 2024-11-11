@@ -67,6 +67,9 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
+  } else if(r_scause() == 0xf){
+    printf("No se puede escribir en 0x%lx, ya que se ecuentra protegido\n", r_stval());
+    p->trapframe->epc += 4;
   } else {
     printf("usertrap(): unexpected scause 0x%lx pid=%d\n", r_scause(), p->pid);
     printf("            sepc=0x%lx stval=0x%lx\n", r_sepc(), r_stval());

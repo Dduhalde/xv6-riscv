@@ -5,6 +5,8 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "proc.h"
+#include "spinlock.h"
 
 /*
  * the kernel's page table.
@@ -448,4 +450,107 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+// tarea 3
+int
+mprotect(void *addr, int len) {
+    struct proc *p = myproc();
+    pte_t *pte;
+    uint64 i;
+
+    // Verificar longitud inválida y que no se pase del tamaño del proceso
+    if (len <= 0 || (uint64)addr >= p->sz || (uint64)addr + len * PGSIZE > p->sz) {
+        printf("mprotect: wrong length\n");
+        return -1;
+    }
+
+    // Verificar que la dirección está alineada a página
+    if ((uint64)addr % PGSIZE != 0) {
+        printf("mprotect: wrong address alignment\n");
+        return -1;
+    }
+
+    // Recorrer las páginas y cambiar los permisos
+    for (i = PGROUNDDOWN((uint64)addr); i < (uint64)addr + len * PGSIZE; i += PGSIZE) {
+        // Encontrar la PTE
+        pte = walk(p->pagetable, i, 0);
+
+        // Verificar que se realizo correctamente el walk
+        if (pte == 0) {
+            printf("mprotect: walk failed\n");
+            return -1;
+        }
+
+        // Verificar que la página es válida
+        if ((*pte & PTE_V) == 0) {
+            printf("mprotect: invalid entry\n");
+            return -1;
+        }
+
+        // Verificar que la página es de usuario
+        if ((*pte & PTE_U) == 0) {
+            printf("mprotect: not user page\n");
+            return -1;
+        }
+        // Deshabilitar el permiso de escritura
+        *pte &= ~PTE_W;
+        printf("mprotect: write access removed for address 0x%lx\n", i);
+    }
+
+    // Invalidar TLB para que el cambio de permisos sea efectivo
+    sfence_vma();
+    return 0;
+}
+
+
+int
+munprotect(void *addr, int len)
+{
+    struct proc *p = myproc();
+    pte_t *pte;
+    uint64 i;
+
+    // Verificar longitud inválida y que no se pase del tamaño del proceso
+    if (len <= 0 || (uint64)addr + len * PGSIZE > p->sz) {
+        printf("munprotect: wrong length\n");
+        return -1;
+    }
+
+    // Verificar que la dirección está alineada a página
+    if ((uint64)addr % PGSIZE != 0) {
+        printf("munprotect: wrong address alignment\n");
+        return -1;
+    }
+
+    // Recorrer las páginas y cambiar los permisos
+    for (i = PGROUNDDOWN((uint64) addr); i < ((uint64) addr + (len) * PGSIZE); i += PGSIZE) {
+        // Encontrar la PTE
+        pte = walk(p->pagetable, (uint64) i, 0);
+
+        // Verificar que se realizo correctamente el walk
+        if (pte == 0) {
+            printf("munprotect: walk failed\n");
+            return -1;
+        }
+
+        // Verificar que la página es válida
+        if ((*pte & PTE_V) == 0) {
+            printf("munprotect: invalid entry\n");
+            return -1;
+        }
+
+        // Verificar que la página es de usuario
+        if ((*pte & PTE_U) == 0) {
+            printf("munprotect: not user page\n");
+            return -1;
+        }
+        // Habilitar el permiso de escritura
+        *pte |= PTE_W;
+        printf("munprotect: write access allowed for address 0x%lx\n", i);
+    }
+
+    // Invalidar TLB para que el cambio de permisos sea efectivo
+    sfence_vma();
+    return 0;
 }
