@@ -26,6 +26,8 @@ struct inode {
   short minor;
   short nlink;
   uint size;
+  int mode; // tarea 4
+  int immu; // tarea 4
   uint addrs[NDIRECT+1];
 };
 

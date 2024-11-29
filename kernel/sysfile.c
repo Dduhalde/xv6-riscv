@@ -271,6 +271,7 @@ create(char *path, short type, short major, short minor)
   ip->major = major;
   ip->minor = minor;
   ip->nlink = 1;
+  ip->mode = 3; // tarea 4
   iupdate(ip);
 
   if(type == T_DIR){  // Create . and .. entries.
@@ -347,6 +348,13 @@ sys_open(void)
     iunlockput(ip);
     end_op();
     return -1;
+  }
+
+  if ((omode & O_WRONLY) || (omode & O_RDWR)) {
+    if ((ip->mode & 2) == 0) { // Sin permiso de escritura
+        iunlockput(ip);
+        return -1; // Retornar error
+    }
   }
 
   if(ip->type == T_DEVICE){
@@ -501,5 +509,40 @@ sys_pipe(void)
     fileclose(wf);
     return -1;
   }
+  return 0;
+}
+
+// tarea 4
+
+uint64
+sys_chmod(void) {
+  char pathname[MAXPATH];
+  int mode;
+
+  argint(1, &mode);
+
+  if (argstr(0, pathname, MAXPATH) < 0) {
+    return -1;
+  }
+
+
+  struct inode *ip = namei(pathname);
+  if (ip == 0)
+    return -1;
+
+  if (ip->immu == 1) { // Si el archivo es inmutable no se puede cambiar el modo
+    printf("The file is immutable. \n");
+    return -1;
+  }
+
+  ilock(ip);
+  if (mode == 5) {  // Si el modo es 5, se hace inmutable y solo lectura (1)
+    ip->immu = 1;
+    ip->mode = 1;
+  } else {
+    ip->mode = mode & 3; // En otro caso, se cambia el modo normalmente
+  }
+  iunlock(ip);
+
   return 0;
 }

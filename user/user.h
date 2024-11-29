@@ -38,6 +38,9 @@ int atoi(const char*);
 int memcmp(const void *, const void *, uint);
 void *memcpy(void *, const void *, uint);
 
+// tarea 4
+int chmod(char*, int);
+
 // umalloc.c
 void* malloc(uint);
 void free(void*);

@@ -271,6 +271,7 @@ iget(uint dev, uint inum)
   ip->inum = inum;
   ip->ref = 1;
   ip->valid = 0;
+  ip->mode = 3; // tarea 4
   release(&itable.lock);
 
   return ip;
@@ -474,6 +475,10 @@ readi(struct inode *ip, int user_dst, uint64 dst, uint off, uint n)
   uint tot, m;
   struct buf *bp;
 
+  // tarea 4
+  if ((ip->mode & 1) == 0)
+    return -1; // No tiene permisos de lectura
+
   if(off > ip->size || off + n < off)
     return 0;
   if(off + n > ip->size)
@@ -507,6 +512,11 @@ writei(struct inode *ip, int user_src, uint64 src, uint off, uint n)
 {
   uint tot, m;
   struct buf *bp;
+
+  // tarea 4
+  if(ip->mode == 0 || (ip->mode & 2) == 0)
+    return -1; // no write permission
+
 
   if(off > ip->size || off + n < off)
     return -1;

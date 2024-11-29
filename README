@@ -1,49 +1,357 @@
-xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
-Version 6 (v6).  xv6 loosely follows the structure and style of v6,
-but is implemented for a modern RISC-V multiprocessor using ANSI C.
+# Informe Tarea 4
+## Pasos Seguidos
+### 1. Creación Rama
 
-ACKNOWLEDGMENTS
+En un primer lugar se verifican todas las ramas con el comando `git branch`, me percato que actualmente me encuentro en diego_duhalde_t3, cambio a la rama principal llamada riscv con el comando `git checkout riscv` y desde esa rama “limpia” creo la nueva rama diego_duhalde_t4 con el comando `git checkout -b diego_duhalde_t4`.
 
-xv6 is inspired by John Lions's Commentary on UNIX 6th Edition (Peer
-to Peer Communications; ISBN: 1-57398-013-7; 1st edition (June 14,
-2000)).  See also https://pdos.csail.mit.edu/6.1810/, which provides
-pointers to on-line resources for v6.
+### 2. Modificación Archivo `defs.h`
 
-The following people have made contributions: Russ Cox (context switching,
-locking), Cliff Frey (MP), Xiao Yu (MP), Nickolai Zeldovich, and Austin
-Clements.
+Siguiendo las especificaciones de la tarea entregada por el profesor, se agrega al final del archivo lo siguiente para definir la función `chmod` a implementar.
 
-We are also grateful for the bug reports and patches contributed by
-Takahiro Aoyagi, Marcelo Arroyo, Silas Boyd-Wickizer, Anton Burtsev,
-carlclone, Ian Chen, Dan Cross, Cody Cutler, Mike CAT, Tej Chajed,
-Asami Doi,Wenyang Duan, eyalz800, Nelson Elhage, Saar Ettinger, Alice
-Ferrazzi, Nathaniel Filardo, flespark, Peter Froehlich, Yakir Goaron,
-Shivam Handa, Matt Harvey, Bryan Henry, jaichenhengjie, Jim Huang,
-Matúš Jókay, John Jolly, Alexander Kapshuk, Anders Kaseorg, kehao95,
-Wolfgang Keller, Jungwoo Kim, Jonathan Kimmitt, Eddie Kohler, Vadim
-Kolontsov, Austin Liew, l0stman, Pavan Maddamsetti, Imbar Marinescu,
-Yandong Mao, Matan Shabtay, Hitoshi Mitake, Carmi Merimovich, Mark
-Morrissey, mtasm, Joel Nider, Hayato Ohhashi, OptimisticSide,
-phosphagos, Harry Porter, Greg Price, RayAndrew, Jude Rich, segfault,
-Ayan Shafqat, Eldar Sehayek, Yongming Shen, Fumiya Shigemitsu, snoire,
-Taojie, Cam Tenny, tyfkda, Warren Toomey, Stephen Tu, Alissa Tung,
-Rafael Ubal, Amane Uehara, Pablo Ventura, Xi Wang, WaheedHafez,
-Keiichi Watanabe, Lucas Wolf, Nicolas Wolovick, wxdao, Grant Wu, x653,
-Jindong Zhang, Icenowy Zheng, ZhUyU1997, and Zou Chang Wei.
+```
+// tarea 4
+int             chmod(char*, int);
+```
 
-The code in the files that constitute xv6 is
-Copyright 2006-2024 Frans Kaashoek, Robert Morris, and Russ Cox.
+### 3. Modificación Archivo `file.h`
 
-ERROR REPORTS
+Dentro de la definición del struct de inode se crean los nuevos dos parámetros que tendrá este, primero el más importante llamado mode, que será el encargado de ver en que modo (Solo lectura, solo escritura, ambos) se encuentra el inodo, también se agrega el parámetro de immu, el cual siguiendo las especificaciones de la parte dos de la tarea define si es inmutable o no.
 
-Please send errors and suggestions to Frans Kaashoek and Robert Morris
-(kaashoek,rtm@mit.edu).  The main purpose of xv6 is as a teaching
-operating system for MIT's 6.1810, so we are more interested in
-simplifications and clarifications than new features.
+```
+  int mode; // tarea 4
+  int immu; // tarea 4
+```
 
-BUILDING AND RUNNING XV6
+### 4. Modificación Archivo `fs.c`
 
-You will need a RISC-V "newlib" tool chain from
-https://github.com/riscv/riscv-gnu-toolchain, and qemu compiled for
-riscv64-softmmu.  Once they are installed, and in your shell
-search path, you can run "make qemu".
+Dentro de iget se agrega la inicialización del modo del inodo con el valor de 3, esto dado a las especificaciones de la tarea, el cual significa que tiene permisos de lectura y escritura.
+
+```
+  ip->mode = 3; // tarea 4
+```
+
+A su vez dentro del mismo archivo se agrega dentro de readi (función encargada de leer la data del inodo) la verificación de que el inodo se encuentre en modo lectura, si los tiene continua la ejecución, en caso contrario no procede con la lectura del inodo.
+
+```
+// tarea 4
+  if ((ip->mode & 1) == 0)
+    return -1; // No tiene permisos de lectura
+```
+
+Siguiendo la misma lógica de lo anterior se agrega lo mismo, pero dentro de writei, verificando si el inodo cuenta con los permisos de escritura para proceder con esta.
+
+```
+// tarea 4
+  if(ip->mode == 0 || (ip->mode & 2) == 0)
+    return -1; // no write permission
+```
+
+### 5. Modificación Archivo `sysfile.c`
+
+Dentro de create se inicializa mode en 3 según especificaciones de la tarea, para tener ambos permisos al inicio
+
+```
+ip->mode = 3; // tarea 4
+```
+
+Dentro de sys_open, se agrega la verificación de que si tiene permisos de solo lectura o de escritura y lectura, si pasa esta verificación se verifica si el inodo está en modo de escritura, si no es así se libera el inodo y se retorna error.
+
+```
+if ((omode & O_WRONLY) || (omode & O_RDWR)) {
+    if ((ip->mode & 2) == 0) { // Sin permiso de escritura
+        iunlockput(ip);
+        return -1; // Retornar error
+    }
+  }
+```
+
+Al final del archivo se crea sys_chmod que contiene toda la lógica de la nueva implementación, en él se crea un inodo a partir del archivo entregado, si el parámetro immu es 1 significa que el archivo es inmutable, por lo que termina la ejecución, si el modo entregado es 5, se ajusta immu a 1 y mode a 1, especificando solo lectura e inmutable (ya no puede cambiar de modo), para cualquier otro caso (1, 2 y 3), solo cambia el modo al especificado. Es muy importante que la verificación de immu sea antes de cualquier cambio, ya que si el inodo se encuentra inmutable no debería permitir cambios.
+
+```
+uint64
+sys_chmod(void) {
+  char pathname[MAXPATH];
+  int mode;
+
+  argint(1, &mode);
+
+  if (argstr(0, pathname, MAXPATH) < 0) {
+    return -1;
+  }
+
+
+  struct inode *ip = namei(pathname);
+  if (ip == 0)
+    return -1;
+
+  if (ip->immu == 1) { // Si el archivo es inmutable no se puede cambiar el modo
+    printf("The file is immutable. \n");
+    return -1;
+  }
+
+  ilock(ip);
+  if (mode == 5) {  // Si el modo es 5, se hace inmutable y solo lectura (1)
+    ip->immu = 1;
+    ip->mode = 1;
+  } else {
+    ip->mode = mode & 3; // En otro caso, se cambia el modo normalmente
+  }
+  iunlock(ip);
+
+  return 0;
+}
+```
+
+### 6. Ajustes Extras
+
+Como ya se realizó en las tareas anteriores, cuando se implementan funcionalidades hay que modificar varios archivos que las involucran para que se ejecuten correctamente.
+
+* Dentro de la carpeta `kernel` tal como se hizo en la tarea cambiando principalmente los nombres, es necesario agregar llamadas a los archivos `syscall.h` y `syscall.c`.
+
+Archivo `syscall.h`
+
+    #define SYS_chmod  22
+
+Archivo `syscall.c`
+
+    extern uint64 sys_chmod(void);
+    ...
+    [SYS_chmod]   sys_chmod,
+
+* Dentro de la carpeta `user`, específicamente del archivo `user.h` se añade lo siguiente
+
+```
+// tarea 4
+int chmod(char*, int);
+```
+
+* Finalmente, dentro del archivo `usys.pl` se agregan las siguientes líneas
+
+```
+entry("chmod");
+```
+
+### 7. Programa de Prueba
+
+- #### Creación Archivo de Pruebas
+    Se crean los archivos de pruebas llamados `test_t4.1.c` y `test_t4.2.c`, para realizar todos los test especificados en el enunciado de la tarea. Estos archivos deben estar ubicados dentro de la carpeta `user`.
+- #### Lógica Programa de Pruebas 1
+    - Primero se llama todo lo necesario para la ejecución del programa, esto vendría siendo las primeras 5 líneas del código.
+    - Luego se añade la lógica del `main`, el cual no tiene que recibir argumentos, ya que todo ya se encuentra contenido en el programa. En una primera instancia se crea el archivo de nombre testfile en modo de lectura y escritura, luego se intenta escribir algo dentro de este (Como el inodo se inicializa en modo 3, lectura/escritura, la escritura debería ser exitosa), luego utilizando chmod se cambian los permisos a solo lectura, para seguir probando escribir en el archivo, como se cambió a modo 1 de solo lectura el comportamiento esperado sería no poder escribir, luego se cambian los permisos a lectura y escritura, para pasar a intentar escribir de nuevo dentro del archivo, esta última escritura debería ser exitosa, finalmente se muestra el contenido final del archivo testfile, el cual debería ser "Contenido final.". Demostrando que el contenido cambio al contar con los permisos de escritura.
+    ```
+    #include "kernel/types.h"
+    #include "kernel/stat.h"
+    #include "user/user.h"
+    #include "kernel/riscv.h"
+    #include "kernel/fcntl.h"
+
+    int
+    main(int argc, char *argv[])
+    {
+    char *filename = "testfile";
+    int fd;
+
+    // 1. Creación del Archivo: O_CREATE | O_RDWR
+    fd = open(filename, O_CREATE | O_RDWR);
+    if (fd < 0) {
+        printf("Error: No se pudo crear el archivo.\n");
+        exit(1);
+    }
+    printf("Archivo '%s' creado con éxito.\n", filename);
+
+    // 2. Escritura Inicial
+    char *initial_content = "Contenido inicial.\n";
+    if (write(fd, initial_content, strlen(initial_content)) < 0) {
+        printf("Error: No se pudo escribir en el archivo.\n");
+        close(fd);
+        exit(1);
+    }
+    printf("Escritura inicial realizada con éxito.\n");
+    close(fd);
+
+    // 3. Cambio de Permisos a Solo Lectura
+    if (chmod(filename, 1) < 0) {
+        printf("Error: No se pudo cambiar los permisos a solo lectura.\n");
+        exit(1);
+    }
+    printf("Permisos cambiados a solo lectura.\n");
+
+    // 4. Prueba de Escritura con Solo Lectura
+    fd = open(filename, O_WRONLY);
+    if (fd >= 0) {
+        printf("Error: Se abrió el archivo en modo escritura cuando debería fallar.\n");
+        close(fd);
+        exit(1);
+    } else {
+        printf("Correcto: No se pudo abrir el archivo en modo escritura (solo lectura).\n");
+    }
+
+    // 5. Cambio de Permisos de Vuelta a Lectura/Escritura
+    if (chmod(filename, 3) < 0) {
+        printf("Error: No se pudo cambiar los permisos a lectura/escritura.\n");
+        exit(1);
+    }
+    printf("Permisos cambiados a lectura/escritura.\n");
+
+    // 6. Escritura Final
+    fd = open(filename, O_RDWR);
+    if (fd < 0) {
+        printf("Error: No se pudo abrir el archivo en modo lectura/escritura.\n");
+        exit(1);
+    }
+    char *final_content = "Contenido final.\n";
+    if (write(fd, final_content, strlen(final_content)) < 0) {
+        printf("Error: No se pudo escribir en el archivo en modo lectura/escritura.\n");
+        close(fd);
+        exit(1);
+    }
+    printf("Escritura final realizada con éxito.\n");
+    
+    // 7. Mostrar contenido del archivo
+    char buf[100];
+    fd = open(filename, O_RDONLY);
+    if (fd < 0) {
+        printf("Error: No se pudo abrir el archivo para lectura.\n");
+        exit(1);
+    }
+    if (read(fd, buf, sizeof(buf)) < 0) {
+        printf("Error: No se pudo leer el archivo.\n");
+        close(fd);
+        exit(1);
+    }
+    printf("\nContenido del archivo: %s\n", buf);
+
+    // Fin del programa
+    printf("Pruebas completadas exitosamente.\n");
+    exit(0);
+    }
+    ```
+
+- #### Lógica Programa de Pruebas 2
+
+La lógica del programa de pruebas 2 (en el cual se testea el modo 5 que incluye la característica de volver inmutable al inodo), es muy similar y sigue los mismos principios del programa anterior, lo único nuevo es que al cambiar en el paso 3 a solo lectura e inmutable, no se pueden volver a realizar cambios en el modo del inodo (ya que es inmutable), por lo que en el paso 5 no se puede cambiar a lectura/escritura, por ende en el paso 6 no se puede escribir en el archivo y al mostrar el contenido del archivo en el paso 7 solo nos muestra el contenido escrito al inicio el programa.
+
+```
+    #include "kernel/types.h"
+    #include "kernel/stat.h"
+    #include "user/user.h"
+    #include "kernel/riscv.h"
+    #include "kernel/fcntl.h"
+
+    int
+    main(int argc, char *argv[])
+    {
+    char *filename = "testfile";
+    int fd;
+
+    // 1. Creación del Archivo: O_CREATE | O_RDWR
+    fd = open(filename, O_CREATE | O_RDWR);
+    if (fd < 0) {
+        printf("Error: No se pudo crear el archivo.\n");
+        exit(1);
+    }
+    printf("Archivo '%s' creado con éxito.\n", filename);
+
+    // 2. Escritura Inicial
+    char *initial_content = "Contenido inicial.\n";
+    if (write(fd, initial_content, strlen(initial_content)) < 0) {
+        printf("Error: No se pudo escribir en el archivo.\n");
+        close(fd);
+        exit(1);
+    }
+    printf("Escritura inicial realizada con éxito.\n");
+    close(fd);
+
+    // 3. Cambio de Permisos a Solo Lectura e Inmutable
+    if (chmod(filename, 5) < 0) {
+        printf("Error: No se pudo cambiar los permisos a solo lectura.\n");
+        exit(1);
+    }
+    printf("Permisos cambiados a solo lectura e inmutable.\n");
+
+    // 4. Prueba de Escritura con Solo Lectura
+    fd = open(filename, O_WRONLY);
+    if (fd >= 0) {
+        printf("Error: Se abrió el archivo en modo escritura cuando debería fallar.\n");
+        close(fd);
+        exit(1);
+    } else {
+        printf("Correcto: No se pudo abrir el archivo en modo escritura (solo lectura).\n");
+    }
+
+    // 5. Cambio de Permisos de Vuelta a Lectura/Escritura
+    if (chmod(filename, 3) > 0) {
+        printf("Error: Se pudo cambiar los permisos a lectura/escritura.\n");
+        exit(1);
+    }
+    printf("Correcto: No se puede cambiar a lectura/escritura si es innmutable.\n");
+
+    // 6. Escritura Final
+    fd = open(filename, O_RDWR);
+    if (fd > 0) {
+        printf("Error: Se pudo abrir el archivo en modo lectura/escritura.\n");
+        exit(1);
+    } else {
+        printf("Correcto: No se pudo abrir el archivo en modo lectura/escritura (Solo lectura).\n");
+    }
+    char *final_content = "Contenido final.\n";
+    if (write(fd, final_content, strlen(final_content)) > 0) {
+        printf("Error: Se pudo escribir en el archivo en modo lectura/escritura.\n");
+        close(fd);
+        exit(1);
+    } else {
+        printf("Correcto: No se pudo escribir en el archivo (Solo lectura).\n");
+    }
+    
+    close(fd);
+
+    // 7. Mostrar contenido del archivo
+    char buf[100];
+    fd = open(filename, O_RDONLY);
+    if (fd < 0) {
+        printf("Error: No se pudo abrir el archivo para lectura.\n");
+        exit(1);
+    }
+    if (read(fd, buf, sizeof(buf)) < 0) {
+        printf("Error: No se pudo leer el archivo.\n");
+        close(fd);
+        exit(1);
+    }
+    printf("\nContenido del archivo: %s\n", buf);
+
+    // Fin del programa
+    printf("Pruebas completadas exitosamente.\n");
+    exit(0);
+    }
+```
+
+- #### Ajuste `Makefile`
+
+    Finalmente, para que se pueda ejecutar el programa de pruebas es necesario añadir su llamada al archivo de `Makefile`, ya que si no se realiza este paso aunque el archivo como tal exista el SO no lo va a reconocer como tal. Siguiendo la misma lógica que en las tareas anteriores, se añade `$U/_test_t4.1\` y `$U/_test_t4.2\`.
+
+## Pruebas Realizadas
+
+Al ejecutar el programa de pruebas 1 utilizando `test_t4.2` se consigue el siguiente output: 
+
+![alt text](image-1.png)
+
+En él se puede ver que se crea el archivo, se escribe con éxito, se cambia a solo lectura, por lo que no se puede abrir en modo escritura, luego se cambian correctamente los permisos a lectura/escritura y se escribe exitosamente dentro del archivo, para finalmente mostrar el contenido del archivo y ver que ahora es "Contenido final.", cuando en la escritura inicial su contenido era "Contenido inicial.".
+
+Al ejecutar el programa de pruebas 2 utilizando `test_t4.2` se consigue el siguiente output:
+
+![alt text](image.png)
+
+En él se puede ver que se crea el archivo, se escribe con éxito, se cambian los permisos a solo lectura e inmutable y luego no deja abrir el archivo en modo escritura, al intentar cambiar el archivo a lectura/escritura arroja que el archivo es inmutable, luego no deja abrir el archivo en modo lectura/escritura y tampoco deja escribir en él, finalmente cuando mostramos el contenido del archivo sigue siendo "Contenido inicial.", ya que como se mencionó antes no se pudo poner el archivo en modo escritura al ser este inmutable, por lo que tampoco se pudo cambiar su contenido
+
+
+## Dificultas encontradas y soluciones implementadas
+
+Al ya haber existido cuatro entregas previas a esta tarea, todo el desarrollo fue más simple, ya que muchas cosas necesarias para implementar una funcionalidad fueron ya vistas para las tareas anteriores y la tarea actual requería solo cambiar un poco la lógica de la anterior, igualmente se encontraron algunas dificultades:
+
+### 1. Errores al intentar actualizar dinodo
+
+Por alguna razón llegué a actualizar el struct de dinodo, generando diversos errores y claramente tocando cosas que no eran necesarias cambiar para la tarea, luego de analizar un poco mejor todo el código y ver los cambios que se requerían para la tarea llego a la conclusión de que no era necesario tocar nada referido a los dinodos, por lo que revertí cambios y seguí editando el código para poder cumplir con las especificaciones de la tarea.
+
+### 2. Errores en el programa de prueba
+
+En una primera instancia había creado un programa de pruebas que podía entregar un archivo y el número al que se quería cambiar el modo, haciendo todo mucho más manual, pero luego de releer las instrucciones cambia al programa de prueba actual, que siento que cumple mucho mejor con lo requerido para la tarea.
