@@ -41,3 +41,7 @@ void *memcpy(void *, const void *, uint);
 // umalloc.c
 void* malloc(uint);
 void free(void*);
+
+// tarea 5
+int send(int pid, char *msg);
+int receive(char *msg);

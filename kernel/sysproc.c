@@ -79,8 +79,6 @@ sys_kill(void)
   return kill(pid);
 }
 
-// return how many clock tick interrupts have occurred
-// since start.
 uint64
 sys_uptime(void)
 {
@@ -90,4 +88,70 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+// tarea 5
+uint64 
+sys_send(void) {
+    int receiver_pid;
+    uint64 msg_dir;
+
+    argint(0, &receiver_pid);
+    argaddr(1, &msg_dir);
+
+    if (receiver_pid < 0 || msg_dir < 0) // Verificar argumentos
+        return -1;
+
+    char msg_content[128];
+
+    if (copyin(myproc()->pagetable, msg_content, msg_dir, sizeof(char) * 128) < 0) // Verificar que el mensaje sea valido
+        return -1;
+    
+    acquire(&msg_lock); // Asegurarse de que no se interrumpa la escritura
+
+    if (msg_q_tail == MSG_Q_SIZE) { // Verificar que la cola no este llena
+        release(&msg_lock);
+        return -1;
+    }
+
+    msg_queue[msg_q_tail].sender_pid = myproc()->pid; // Guardar el mensaje en la cola
+    safestrcpy(msg_queue[msg_q_tail].content, msg_content, sizeof(msg_content)); // Guardar el mensaje en la cola
+    msg_q_tail++; // Mover el puntero de la cola
+
+    wakeup(&msg_queue);
+    release(&msg_lock);
+
+    return 0;
+}
+
+uint64 
+sys_receive(void) {
+    uint64 msg_dir;
+
+    argaddr(0, &msg_dir);
+
+    if (msg_dir < 0) // Verificar argumentos
+        return -1;
+
+    acquire(&msg_lock); // Asegurarse de que no se interrumpa la lectura
+
+    while (msg_q_head == msg_q_tail) { // Verificar que la cola no este vacia
+        sleep(&msg_queue, &msg_lock);
+    }
+
+    int sender_pid = msg_queue[msg_q_head].sender_pid;
+    char msg_content[128];
+
+    safestrcpy(msg_content, msg_queue[msg_q_head].content, sizeof(msg_content)); // Leer el mensaje de la cola
+
+    if (copyout(myproc()->pagetable, msg_dir, msg_content, sizeof(msg_content)) < 0) { // Verificar que el mensaje sea valido
+        release(&msg_lock);
+        return -1;
+    }
+
+    msg_q_head++; // Mover el puntero de la cola
+
+    release(&msg_lock);
+
+    return sender_pid;
 }

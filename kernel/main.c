@@ -39,6 +39,8 @@ main()
     kvminithart();    // turn on paging
     trapinithart();   // install kernel trap vector
     plicinithart();   // ask PLIC for device interrupts
+    // tarea 5
+    msginit();
   }
 
   scheduler();        

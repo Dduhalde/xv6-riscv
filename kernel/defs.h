@@ -187,3 +187,12 @@ void            virtio_disk_intr(void);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
+
+// tarea 5
+#define MSG_Q_SIZE 32 
+
+extern message msg_queue[MSG_Q_SIZE];
+extern int msg_q_head;
+extern int msg_q_tail;
+
+void            msginit(void);

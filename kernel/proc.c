@@ -693,3 +693,18 @@ procdump(void)
     printf("\n");
   }
 }
+
+// tarea 5
+struct message msg_queue[MSG_Q_SIZE];
+int msg_q_head = 0;
+int msg_q_tail = 0;
+
+struct spinlock msg_lock;
+
+void
+msginit(void)
+{
+  initlock(&msg_lock, "msg_queue_lock");
+  msg_q_head = 0;
+  msg_q_tail = 0;
+}
